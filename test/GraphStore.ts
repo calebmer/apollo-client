@@ -5,7 +5,7 @@ import { parseSelectionSet, parseFragmentDefinitionMap } from './util/graphqlAST
 import { testObservable } from './util/testObservable';
 import { deepFreeze } from '../src/util/maybeDeepFreeze';
 import { ApolloAction } from '../src/actions';
-import { GraphQLData, GraphQLObjectData } from '../src/graphql';
+import { GraphQLData, GraphQLObjectData } from '../src/graphql/data';
 import { ReduxGraphStore, ReduxState } from '../src/graph/store';
 
 const TEST_ID_KEY = Symbol('testIdKey');
@@ -640,16 +640,83 @@ describe('ReduxGraphStore', () => {
   });
 
   describe('watch', () => {
-    it('will throw an error if there is no data for a first read', () => {
+    it('will emit nothing if there is no data for a first read', done => {
       const graph = createGraphStore();
-      try {
-        graph.watch({
-          selectionSet: parseSelectionSet(`{ a b c }`),
+
+      graph.watch({
+        selectionSet: parseSelectionSet(`{ a b c }`),
+      }).subscribe({
+        next: result => done(new Error('Unreachable.')),
+        error: () => done(new Error('Unreachable.')),
+        complete: () => done(new Error('Unreachable.')),
+      });
+
+      setTimeout(() => {
+        done();
+      }, 10);
+    });
+
+    it('will continue to emit nothing if a write does not provided needed data', done => {
+      const graph = createGraphStore();
+
+      graph.watch({
+        selectionSet: parseSelectionSet(`{ a b c }`),
+      }).subscribe({
+        next: () => done(new Error('Unreachable.')),
+        error: () => done(new Error('Unreachable.')),
+        complete: () => done(new Error('Unreachable.')),
+      });
+
+      graph.write({
+        selectionSet: parseSelectionSet('{ a }'),
+        data: { a: 1 },
+      });
+
+      setTimeout(() => {
+        graph.write({
+          selectionSet: parseSelectionSet('{ b }'),
+          data: { b: 2 },
         });
-      } catch (error) {
-        assert.equal(error._partialRead, true);
-        assert.equal(error.message, 'No scalar value found for field \'a\'.');
-      }
+        setTimeout(() => {
+          done();
+        }, 5);
+      }, 5);
+    });
+
+    it('will only emit once the full data for the selection has been assembled', done => {
+      let deadzone = true;
+
+      const graph = createGraphStore();
+
+      graph.watch({
+        selectionSet: parseSelectionSet(`{ a b c }`),
+      }).subscribe({
+        next: result => {
+          if (deadzone) {
+            throw new Error('Cannot emit a value in the deadzone.');
+          }
+          assert.deepEqual(result, {
+            stale: false,
+            data: { a: 1, b: 2, c: 3 },
+          });
+          done();
+        },
+        error: () => done(new Error('Unreachable.')),
+        complete: () => done(new Error('Unreachable.')),
+      });
+
+      graph.write({
+        selectionSet: parseSelectionSet('{ a b }'),
+        data: { a: 1, b: 2 },
+      });
+
+      setTimeout(() => {
+        deadzone = false;
+        graph.write({
+          selectionSet: parseSelectionSet('{ c }'),
+          data: { c: 3 },
+        });
+      }, 10);
     });
 
     it('will get updates from writes', done => {

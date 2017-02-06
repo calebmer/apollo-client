@@ -99,7 +99,7 @@ export class ReduxGraphStore {
       },
       // The root id is wrapped in parentheses to prevent accidental collisions
       // with generated keys.
-      id: `(${rootID})`,
+      id: rootID,
       data: rootData,
       selectionSet,
       fragments,
@@ -162,7 +162,7 @@ export class ReduxGraphStore {
       },
       // The root id is wrapped in parentheses to prevent accidental collisions
       // with generated keys.
-      id: `(${rootID})`,
+      id: rootID,
       data: rootData,
       selectionSet,
       fragments,
@@ -257,7 +257,7 @@ export class ReduxGraphStore {
       graph: graphPrimitives,
       // The root id is wrapped in parentheses to prevent accidental collisions
       // with generated keys.
-      id: `(${rootID})`,
+      id: rootID,
       selectionSet,
       fragments,
       variables,
@@ -280,7 +280,9 @@ export class ReduxGraphStore {
    * partial data where appropriate.
    *
    * When the observable is first subscribed to, an initial read from the store
-   * will be returned.
+   * will be returned. If that fails then nothing will be emit. No data values
+   * will be emit from this observable until the full selection set may be read
+   * from the store.
    */
   public watch ({
     id = DEFAULT_ID,
@@ -303,19 +305,30 @@ export class ReduxGraphStore {
     // We keep track of the previous result across *all* subscriptions so that
     // when we get a new subscription we can instantly push them the most recent
     // data.
-    //
-    // The initial result will use the `initialData` if provided, otherwise we
-    // will do an initial read from the store.
-    //
-    // It is possible that a partial read error may be synchronously thrown
-    // here.
-    let previousResult = initialData ? { stale: false, data: initialData } : this.read({
-      id,
-      selectionSet,
-      fragments,
-      variables,
-      skipUncommitWrites,
-    });
+    let previousResult: { stale: boolean, data: GraphQLObjectData } | undefined;
+
+    // Use the `initialData` if provided.
+    if (initialData) {
+      previousResult = { stale: false, data: initialData };
+    }
+    // Try to read from the store. If a partial read error is thrown then catch
+    // and ignore it.
+    else {
+      try {
+        previousResult = this.read({
+          id,
+          selectionSet,
+          fragments,
+          variables,
+          skipUncommitWrites,
+        });
+      } catch (error) {
+        // Throw all errors that are not partial read errors.
+        if (!error._partialRead) {
+          throw error;
+        }
+      }
+    }
 
     // An array of observers that will be called whenever we get some new data.
     const observers: Array<Observer<{ stale: boolean, data: GraphQLObjectData }>> = [];
@@ -330,7 +343,7 @@ export class ReduxGraphStore {
           selectionSet,
           fragments,
           variables,
-          previousData: previousResult.data,
+          previousData: previousResult && previousResult.data,
           skipUncommitWrites,
         });
 
@@ -340,21 +353,29 @@ export class ReduxGraphStore {
         // We call on the next tick so that if any errors are thrown then the
         // error will become an unhandled error allowing the user to deal with
         // it.
-        if (nextResult.data !== previousResult.data || nextResult.stale !== previousResult.stale) {
+        if (typeof previousResult === 'undefined' || nextResult.data !== previousResult.data || nextResult.stale !== previousResult.stale) {
           observers.forEach(observer => setTimeout(() => observer.next && observer.next(nextResult), 0));
           previousResult = nextResult;
         }
       } catch (error) {
+        // If the previous result was undefined and this was a partial read
+        // error then we don’t want to report this error. Instead we want to
+        // continue being silent. Waiting for a complete read.
+        if (typeof previousResult === 'undefined' && error._partialRead) {
+          return;
+        }
         // If we caught an error then we must emit an error for all of our
         // observers.
-        observers.forEach(observer => setTimeout(() => observer.error && observer.error(error), 0));
+        observers.forEach(observer => observer.error && observer.error(error));
       }
     };
 
     return new Observable(observer => {
       // Instantly start the observable with the previous result on the next
       // tick.
-      setTimeout(() => observer.next && observer.next(previousResult), 0);
+      if (observer.next && typeof previousResult !== 'undefined') {
+        observer.next(previousResult);
+      }
 
       // Add the observer to our array of observers.
       observers.push(observer);
