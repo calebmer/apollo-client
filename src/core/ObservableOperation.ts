@@ -94,6 +94,9 @@ export interface OperationState {
  * variables that a user provided. You can see what set of variables that is by
  * looking at the state with: `observable.getState().variables`.
  *
+ * The operation will not start watching the store until either `execute` or
+ * `maybeExecute` is called.
+ *
  * This integrated live view into the graph store can be very useful for UI
  * integration authors.
  */
@@ -157,13 +160,11 @@ export class ObservableOperation extends Observable<OperationState> {
     executor,
     operation,
     fragments,
-    initialVariables = {},
   }: {
     graph: ReduxGraphStore,
     executor: ExecutorFn,
     operation: OperationDefinitionNode,
     fragments?: { [fragmentName: string]: FragmentDefinitionNode },
-    initialVariables?: { [variableName: string]: GraphQLData },
   }) {
     super(observer => this._onSubscribe(observer));
 
@@ -178,14 +179,11 @@ export class ObservableOperation extends Observable<OperationState> {
     this._state = {
       loading: false,
       executing: false,
-      variables: initialVariables,
+      variables: {},
       canonical: false,
       stale: false,
       errors: [],
     };
-
-    // As a side effect, start watching the graph.
-    this._watch();
   }
 
   /**
