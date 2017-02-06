@@ -1,5 +1,5 @@
 import { SelectionSetNode, FragmentDefinitionNode } from 'graphql';
-import { GraphQLData, GraphQLObjectData, GraphQLArrayData, isObjectData } from '../graphql';
+import { GraphQLData, GraphQLObjectData, GraphQLArrayData, isObjectData } from '../graphql/data';
 import { ID_KEY, GraphReference, getFieldKey } from './common';
 
 /**
