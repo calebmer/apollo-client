@@ -58,4 +58,3 @@ import './readFromGraph';
 import './GraphStore';
 import './writeThenReadFromGraph';
 import './ObservableOperation';
-import './ObservableQuery2';

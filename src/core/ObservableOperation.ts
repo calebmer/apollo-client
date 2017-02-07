@@ -127,7 +127,7 @@ export class ObservableOperation extends Observable<OperationState> {
    * The root identifier to use when reading and writing from the store for our
    * operation. If null, then the store will never be watched.
    */
-  private readonly _rootID: string | null;
+  private readonly _rootID: string;
 
   /**
    * **IMPORTANT**: These observers should not be used directly. Instead use the
@@ -166,6 +166,11 @@ export class ObservableOperation extends Observable<OperationState> {
     operation: OperationDefinitionNode,
     fragments?: { [fragmentName: string]: FragmentDefinitionNode },
   }) {
+    // Consider if we want to allow mutations here?
+    if (operation.operation === 'mutation') {
+      throw new Error('Mutations may not be observed.');
+    }
+
     super(observer => this._onSubscribe(observer));
 
     this._graph = graph;
@@ -173,7 +178,7 @@ export class ObservableOperation extends Observable<OperationState> {
     this._execution = null;
     this._operation = operation;
     this._fragments = fragments;
-    this._rootID = operation.operation === 'mutation' ? null : operation.operation.toLowerCase();
+    this._rootID = operation.operation;
     this._observers = [];
 
     this._state = {
@@ -330,12 +335,6 @@ export class ObservableOperation extends Observable<OperationState> {
       throw new Error('Cannot start a new execution when another execution is currently running.');
     }
 
-    // If there is no root id then we must execute.
-    if (this._rootID === null) {
-      this.execute(variables);
-      return;
-    }
-
     try {
       // Try reading our operation from th store with the provided variables. If
       // it fails with a partial read error we will performan an execution.
@@ -389,12 +388,6 @@ export class ObservableOperation extends Observable<OperationState> {
    * selection set.
    */
   private _watch (): void {
-    // If the root id is null then nothing can be watched so calling this
-    // function is a noop.
-    if (this._rootID === null) {
-      return;
-    }
-
     // Throw an error if there is currently another watcher watching this query.
     if (this._watcher) {
       throw new Error('Cannot start watching the graph when the graph is currently being watched.');

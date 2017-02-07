@@ -43,16 +43,6 @@ function createGraphStore (): ReduxGraphStore {
   return graphStore;
 }
 
-function observableOf <T>(values: Array<T>): Observable<T> {
-  return new Observable(observer => {
-    values.forEach(value => observer.next && observer.next(value));
-    if (observer.complete) {
-      observer.complete();
-    }
-    return () => { /* noop */ };
-  });
-}
-
 describe.only('ObservableOperation', () => {
   it('will emit the default state and nothing else if execute was not called', done => {
     let noMore = false;
@@ -1340,7 +1330,688 @@ describe.only('ObservableOperation', () => {
     }, 10);
   });
 
-    describe('getState', () => {
+  it('will execute a request even if there are no observable subscribers', done => {
+    const executions: Array<Array<any>> = [];
+    const graph = createGraphStore();
+    const operation = parseOperationDefinition(`{ a b c }`);
+    const observable = new ObservableOperation({
+      graph,
+      executor: (...args: Array<any>) => {
+        executions.push(args);
+        return new Observable(observer => {
+          setTimeout(() => {
+            observer.next!({
+              data: { a: (executions.length * 3) - 2, b: (executions.length * 3) - 1, c: (executions.length * 3) - 0 },
+              errors: [],
+            });
+            observer.complete!();
+          }, 5);
+          return () => { /* noop */ };
+        });
+      },
+      operation,
+    });
+    assert.deepEqual(observable.getState(), {
+      loading: false,
+      executing: false,
+      variables: {},
+      canonical: false,
+      stale: false,
+      errors: [],
+    });
+    observable.execute({ x: 1, y: 2, z: 3 });
+    assert.deepEqual(observable.getState(), {
+      loading: true,
+      executing: true,
+      variables: {},
+      canonical: false,
+      stale: false,
+      errors: [],
+    });
+    setTimeout(() => {
+      assert.deepEqual(observable.getState(), {
+        loading: false,
+        executing: false,
+        variables: { x: 1, y: 2, z: 3 },
+        canonical: true,
+        stale: false,
+        errors: [],
+        data: { a: 1, b: 2, c: 3 },
+      });
+      observable.execute({ x: 4, y: 5, z: 6 });
+      assert.deepEqual(observable.getState(), {
+        loading: true,
+        executing: true,
+        variables: { x: 1, y: 2, z: 3 },
+        canonical: true,
+        stale: false,
+        errors: [],
+        data: { a: 1, b: 2, c: 3 },
+      });
+      setTimeout(() => {
+        assert.deepEqual(observable.getState(), {
+          loading: false,
+          executing: false,
+          variables: { x: 4, y: 5, z: 6 },
+          canonical: true,
+          stale: false,
+          errors: [],
+          data: { a: 4, b: 5, c: 6 },
+        });
+        done();
+      }, 10);
+    }, 10);
+  });
+
+  it('will update if variables change but data does not', done => {
+    const executions: Array<Array<any>> = [];
+    const graph = createGraphStore();
+    const operation = parseOperationDefinition(`{ a b c }`);
+    const observable = new ObservableOperation({
+      graph,
+      executor: (...args: Array<any>) => {
+        executions.push(args);
+        return new Observable(observer => {
+          observer.next!({
+            data: { a: 1, b: 2, c: 3 },
+            errors: [],
+          });
+          observer.complete!();
+          return () => { /* noop */ };
+        });
+      },
+      operation,
+    });
+    let counter = 0;
+    observable.subscribe({
+      next: result => {
+        switch (counter++) {
+          case 0:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            observable.execute({ x: 1, y: 2, z: 3 });
+            break;
+          case 1:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: { x: 1, y: 2, z: 3 },
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { a: 1, b: 2, c: 3 },
+            });
+            observable.execute({ x: 4, y: 5, z: 6 });
+            break;
+          case 2:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: { x: 4, y: 5, z: 6 },
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { a: 1, b: 2, c: 3 },
+            });
+            assert.deepEqual(executions, [
+              [{
+                operation,
+                fragments: {},
+                variables: { x: 1, y: 2, z: 3 },
+              }],
+              [{
+                operation,
+                fragments: {},
+                variables: { x: 4, y: 5, z: 6 },
+              }],
+            ]);
+            done();
+            break;
+          default:
+            done(new Error('`next` called too many times.'));
+        }
+      },
+      error: error => done(error),
+      complete: () => done(new Error('Unreachable.')),
+    });
+  });
+
+  it('rerun even if variables do not change', done => {
+    const executions: Array<Array<any>> = [];
+    const graph = createGraphStore();
+    const operation = parseOperationDefinition(`{ a b c }`);
+    const observable = new ObservableOperation({
+      graph,
+      executor: (...args: Array<any>) => {
+        executions.push(args);
+        return new Observable(observer => {
+          observer.next!({
+            data: { a: (executions.length * 3) - 2, b: (executions.length * 3) - 1, c: (executions.length * 3) - 0 },
+            errors: [],
+          });
+          observer.complete!();
+          return () => { /* noop */ };
+        });
+      },
+      operation,
+    });
+    let counter = 0;
+    observable.subscribe({
+      next: result => {
+        switch (counter++) {
+          case 0:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            observable.execute({ x: 1, y: 2, z: 3 });
+            break;
+          case 1:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: { x: 1, y: 2, z: 3 },
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { a: 1, b: 2, c: 3 },
+            });
+            observable.execute({ x: 1, y: 2, z: 3 });
+            break;
+          case 2:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: { x: 1, y: 2, z: 3 },
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { a: 4, b: 5, c: 6 },
+            });
+            assert.deepEqual(executions, [
+              [{
+                operation,
+                fragments: {},
+                variables: { x: 1, y: 2, z: 3 },
+              }],
+              [{
+                operation,
+                fragments: {},
+                variables: { x: 1, y: 2, z: 3 },
+              }],
+            ]);
+            done();
+            break;
+          default:
+            done(new Error('`next` called too many times.'));
+        }
+      },
+      error: error => done(error),
+      complete: () => done(new Error('Unreachable.')),
+    });
+  });
+
+  it('will propogate an error', done => {
+    const error1 = new Error('error 1');
+    const executions: Array<Array<any>> = [];
+    const graph = createGraphStore();
+    const operation = parseOperationDefinition(`{ a b c }`);
+    const observable = new ObservableOperation({
+      graph,
+      executor: (...args: Array<any>) => {
+        executions.push(args);
+        return new Observable(observer => {
+          setTimeout(() => {
+            observer.error!(error1);
+            observer.complete!();
+          }, 10);
+          return () => { /* noop */ };
+        });
+      },
+      operation,
+    });
+    let counter = 0;
+    observable.subscribe({
+      next: result => {
+        switch (counter++) {
+          case 0:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            observable.execute();
+            break;
+          case 1:
+            assert.deepEqual(result, {
+              loading: true,
+              executing: true,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            break;
+          case 3:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            done();
+            break;
+          default:
+            done(new Error('Unexepcted `next` call.'));
+        }
+      },
+      error: error => {
+        switch (counter++) {
+          case 2:
+            assert.strictEqual(error, error1);
+            break;
+          default:
+            done(new Error('Unexepcted `error` call.'));
+        }
+      },
+      complete: () => done(new Error('Unreachable.')),
+    });
+  });
+
+  it('will propogate a synchronous error', done => {
+    const error1 = new Error('error 1');
+    const executions: Array<Array<any>> = [];
+    const graph = createGraphStore();
+    const operation = parseOperationDefinition(`{ a b c }`);
+    const observable = new ObservableOperation({
+      graph,
+      executor: (...args: Array<any>) => {
+        executions.push(args);
+        return new Observable(observer => {
+          observer.error!(error1);
+          observer.complete!();
+          return () => { /* noop */ };
+        });
+      },
+      operation,
+    });
+    let counter = 0;
+    observable.subscribe({
+      next: result => {
+        switch (counter++) {
+          case 0:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            observable.execute();
+            break;
+          case 2:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            done();
+            break;
+          default:
+            done(new Error('Unexepcted `next` call.'));
+        }
+      },
+      error: error => {
+        switch (counter++) {
+          case 1:
+            assert.strictEqual(error, error1);
+            break;
+          default:
+            done(new Error('Unexepcted `error` call.'));
+        }
+      },
+      complete: () => done(new Error('Unreachable.')),
+    });
+  });
+
+  it('will propogate multiple errors from the executor', done => {
+    const error1 = new Error('error 1');
+    const error2 = new Error('error 2');
+    const error3 = new Error('error 3');
+    const error4 = new Error('error 4');
+    const executions: Array<Array<any>> = [];
+    const graph = createGraphStore();
+    const operation = parseOperationDefinition(`{ a b c }`);
+    const observable = new ObservableOperation({
+      graph,
+      executor: (...args: Array<any>) => {
+        executions.push(args);
+        return new Observable(observer => {
+          observer.error!(error1);
+          setTimeout(() => {
+            observer.error!(error2);
+            setTimeout(() => {
+              observer.error!(error3);
+              setTimeout(() => {
+                observer.next!({
+                  data: { a: (executions.length * 3) - 2, b: (executions.length * 3) - 1, c: (executions.length * 3) - 0 },
+                  errors: [],
+                });
+                setTimeout(() => {
+                  observer.error!(error4);
+                  observer.complete!();
+                }, 5);
+              }, 5);
+            }, 5);
+          }, 5);
+          return () => { /* noop */ };
+        });
+      },
+      operation,
+    });
+    let counter = 0;
+    observable.subscribe({
+      next: result => {
+        switch (counter++) {
+          case 0:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            observable.execute();
+            break;
+          case 1:
+            assert.deepEqual(result, {
+              loading: true,
+              executing: true,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            break;
+          case 5:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: true,
+              variables: {},
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { a: 1, b: 2, c: 3 },
+            });
+            break;
+          case 7:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { a: 1, b: 2, c: 3 },
+            });
+            done();
+            break;
+          default:
+            done(new Error('Unexepcted `next` call.'));
+        }
+      },
+      error: error => {
+        switch (counter++) {
+          case 2:
+            assert.strictEqual(error, error1);
+            break;
+          case 3:
+            assert.strictEqual(error, error2);
+            break;
+          case 4:
+            assert.strictEqual(error, error3);
+            break;
+          case 6:
+            assert.strictEqual(error, error4);
+            break;
+          default:
+            done(new Error('Unexepcted `error` call.'));
+        }
+      },
+      complete: () => done(new Error('Unreachable.')),
+    });
+  });
+
+  it('will write execution results to the store', done => {
+    const executions: Array<Array<any>> = [];
+    const graph = createGraphStore();
+    const operation = parseOperationDefinition(`{ foo { bar { a b c } } }`);
+    const observable = new ObservableOperation({
+      graph,
+      executor: (...args: Array<any>) => {
+        executions.push(args);
+        return new Observable(observer => {
+          observer.next!({
+            data: {
+              foo: {
+                [TEST_ID_KEY]: String((executions.length * 4) - 3),
+                bar: {
+                  a: (executions.length * 4) - 2,
+                  b: (executions.length * 4) - 1,
+                  c: (executions.length * 4) - 0,
+                },
+              },
+            },
+            errors: [],
+          });
+          observer.complete!();
+          return () => { /* noop */ };
+        });
+      },
+      operation,
+    });
+    let counter = 0;
+    observable.subscribe({
+      next: result => {
+        switch (counter++) {
+          case 0:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: false,
+              stale: false,
+              errors: [],
+            });
+            try {
+              graph.read({
+                id: 'query',
+                selectionSet: parseSelectionSet(`{ foo { bar { a b c } } }`),
+              });
+              throw new Error('Unreachable.');
+            } catch (error) {
+              assert.equal(error.message, 'No graph reference found for field \'foo\'.');
+              assert.isTrue(error._partialRead);
+            }
+            try {
+              graph.read({
+                id: '(1)',
+                selectionSet: parseSelectionSet(`{ bar { a b c } }`),
+              });
+              throw new Error('Unreachable.');
+            } catch (error) {
+              assert.equal(error.message, 'No graph reference found for field \'bar\'.');
+              assert.isTrue(error._partialRead);
+            }
+            try {
+              graph.read({
+                id: '(1).bar',
+                selectionSet: parseSelectionSet(`{ a b c }`),
+              });
+              throw new Error('Unreachable.');
+            } catch (error) {
+              assert.equal(error.message, 'No scalar value found for field \'a\'.');
+              assert.isTrue(error._partialRead);
+            }
+            observable.execute();
+            break;
+          case 1:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { foo: { bar: { a: 2, b: 3, c: 4 } } },
+            });
+            assert.deepEqual(graph.read({
+              id: 'query',
+              selectionSet: parseSelectionSet(`{ foo { bar { a b c } } }`),
+            }), {
+              stale: false,
+              data: { foo: { bar: { a: 2, b: 3, c: 4 } } },
+            });
+            assert.deepEqual(graph.read({
+              id: '(1)',
+              selectionSet: parseSelectionSet(`{ bar { a b c } }`),
+            }), {
+              stale: false,
+              data: { bar: { a: 2, b: 3, c: 4 } },
+            });
+            assert.deepEqual(graph.read({
+              id: '(1).bar',
+              selectionSet: parseSelectionSet(`{ a b c }`),
+            }), {
+              stale: false,
+              data: { a: 2, b: 3, c: 4 },
+            });
+            observable.execute();
+            break;
+          case 2:
+            assert.deepEqual(result, {
+              loading: false,
+              executing: false,
+              variables: {},
+              canonical: true,
+              stale: false,
+              errors: [],
+              data: { foo: { bar: { a: 6, b: 7, c: 8 } } },
+            });
+            assert.deepEqual(graph.read({
+              id: 'query',
+              selectionSet: parseSelectionSet(`{ foo { bar { a b c } } }`),
+            }), {
+              stale: false,
+              data: { foo: { bar: { a: 6, b: 7, c: 8 } } },
+            });
+            assert.deepEqual(graph.read({
+              id: '(1)',
+              selectionSet: parseSelectionSet(`{ bar { a b c } }`),
+            }), {
+              stale: false,
+              data: { bar: { a: 2, b: 3, c: 4 } },
+            });
+            assert.deepEqual(graph.read({
+              id: '(1).bar',
+              selectionSet: parseSelectionSet(`{ a b c }`),
+            }), {
+              stale: false,
+              data: { a: 2, b: 3, c: 4 },
+            });
+            assert.deepEqual(graph.read({
+              id: '(5)',
+              selectionSet: parseSelectionSet(`{ bar { a b c } }`),
+            }), {
+              stale: false,
+              data: { bar: { a: 6, b: 7, c: 8 } },
+            });
+            assert.deepEqual(graph.read({
+              id: '(5).bar',
+              selectionSet: parseSelectionSet(`{ a b c }`),
+            }), {
+              stale: false,
+              data: { a: 6, b: 7, c: 8 },
+            });
+            assert.deepEqual(executions, [
+              [{
+                operation,
+                fragments: {},
+                variables: {},
+              }],
+              [{
+                operation,
+                fragments: {},
+                variables: {},
+              }],
+            ]);
+            assert.deepEqual((graph as any)._reduxGetState().graphData, {
+              'query': {
+                scalars: {},
+                references: { foo: '(5)' },
+              },
+              '(1)': {
+                scalars: {},
+                references: { bar: '(1).bar' },
+              },
+              '(1).bar': {
+                scalars: { a: 2, b: 3, c: 4 },
+                references: {},
+              },
+              '(5)': {
+                scalars: {},
+                references: { bar: '(5).bar' },
+              },
+              '(5).bar': {
+                scalars: { a: 6, b: 7, c: 8 },
+                references: {},
+              },
+            });
+            done();
+            break;
+          default:
+            done(new Error('Unexpected `next` call.'));
+        }
+      },
+      error: error => done(error),
+      complete: () => done(new Error('Unreachable.')),
+    });
+  });
+
+  it('will error when trying to use a mutation', () => {
+    try {
+      new ObservableOperation({
+        graph: createGraphStore(),
+        executor: (...args: Array<any>) => null as any,
+        operation: parseOperationDefinition(`mutation { a b c }`),
+      });
+      throw new Error('Unreachable.');
+    } catch (error) {
+      assert.equal(error.message, 'Mutations may not be observed.');
+    }
+  });
+
+  describe('getState', () => {
     it('will return the current state', done => {
       const executions: Array<Array<any>> = [];
       const graph = createGraphStore();
@@ -1418,6 +2089,108 @@ describe.only('ObservableOperation', () => {
                 canonical: true,
                 stale: false,
                 errors: [],
+                data: { a: 4, b: 5, c: 6 },
+              });
+              assert.deepEqual(executions, [
+                [{
+                  operation,
+                  fragments: {},
+                  variables: { x: 1, y: 2, z: 3 },
+                }],
+                [{
+                  operation,
+                  fragments: {},
+                  variables: { x: 4, y: 5, z: 6 },
+                }],
+              ]);
+              done();
+              break;
+            default:
+              done(new Error('`next` called too many times.'));
+          }
+        },
+        error: error => done(error),
+        complete: () => done(new Error('Unreachable.')),
+      });
+    });
+
+    it('will return the current state with errors', done => {
+      const executions: Array<Array<any>> = [];
+      const graph = createGraphStore();
+      const operation = parseOperationDefinition(`{ a b c }`);
+      const observable = new ObservableOperation({
+        graph,
+        executor: (...args: Array<any>) => {
+          executions.push(args);
+          return new Observable(observer => {
+            setTimeout(() => {
+              observer.next!({
+                data: { a: (executions.length * 3) - 2, b: (executions.length * 3) - 1, c: (executions.length * 3) - 0 },
+                errors: [{ message: 'Yikes!' }],
+              });
+              observer.complete!();
+            }, 5);
+            return () => { /* noop */ };
+          });
+        },
+        operation,
+      });
+      let counter = 0;
+      observable.subscribe({
+        next: () => {
+          switch (counter++) {
+            case 0:
+              assert.deepEqual(observable.getState(), {
+                loading: false,
+                executing: false,
+                variables: {},
+                canonical: false,
+                stale: false,
+                errors: [],
+              });
+              observable.execute({ x: 1, y: 2, z: 3 });
+              break;
+            case 1:
+              assert.deepEqual(observable.getState(), {
+                loading: true,
+                executing: true,
+                variables: {},
+                canonical: false,
+                stale: false,
+                errors: [],
+              });
+              break;
+            case 2:
+              assert.deepEqual(observable.getState(), {
+                loading: false,
+                executing: false,
+                variables: { x: 1, y: 2, z: 3 },
+                canonical: true,
+                stale: false,
+                errors: [{ message: 'Yikes!' }],
+                data: { a: 1, b: 2, c: 3 },
+              });
+              observable.execute({ x: 4, y: 5, z: 6 });
+              break;
+            case 3:
+              assert.deepEqual(observable.getState(), {
+                loading: true,
+                executing: true,
+                variables: { x: 1, y: 2, z: 3 },
+                canonical: true,
+                stale: false,
+                errors: [{ message: 'Yikes!' }],
+                data: { a: 1, b: 2, c: 3 },
+              });
+              break;
+            case 4:
+              assert.deepEqual(observable.getState(), {
+                loading: false,
+                executing: false,
+                variables: { x: 4, y: 5, z: 6 },
+                canonical: true,
+                stale: false,
+                errors: [{ message: 'Yikes!' }],
                 data: { a: 4, b: 5, c: 6 },
               });
               assert.deepEqual(executions, [
