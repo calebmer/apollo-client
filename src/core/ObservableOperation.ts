@@ -4,7 +4,7 @@ import { GraphQLObjectData, GraphQLData } from '../graphql/data';
 import { GraphQLError } from '../graphql/errors';
 import { ReduxGraphStore } from '../graph/store';
 
-interface ExecutorFn {
+export interface ExecutorFn {
   (options: {
     operation: OperationDefinitionNode,
     fragments?: { [fragmentName: string]: FragmentDefinitionNode },
@@ -159,7 +159,7 @@ export class ObservableOperation extends Observable<OperationState> {
     graph,
     executor,
     operation,
-    fragments,
+    fragments = {},
   }: {
     graph: ReduxGraphStore,
     executor: ExecutorFn,
@@ -173,7 +173,7 @@ export class ObservableOperation extends Observable<OperationState> {
     this._execution = null;
     this._operation = operation;
     this._fragments = fragments;
-    this._rootID = operation.operation === 'mutation' ? null : operation.operation;
+    this._rootID = operation.operation === 'mutation' ? null : operation.operation.toLowerCase();
     this._observers = [];
 
     this._state = {
@@ -220,6 +220,9 @@ export class ObservableOperation extends Observable<OperationState> {
       executing: true,
     });
 
+    // We want to know if we complete synchronously.
+    let completed = false;
+
     // Execute an operation and then subscribe to the results.
     this._execution = this._executor({
       operation: this._operation,
@@ -240,6 +243,8 @@ export class ObservableOperation extends Observable<OperationState> {
           const { data } = this._graph.write({
             id: this._rootID,
             selectionSet: this._operation.selectionSet,
+            fragments: this._fragments,
+            variables,
             data: result.data,
           });
 
@@ -280,12 +285,18 @@ export class ObservableOperation extends Observable<OperationState> {
       // When the observable completes set both `loading` and `executing` to
       // false.
       complete: () => {
-        this._updateState({
-          loading: false,
-          executing: false,
-        });
+        completed = true;
+        if (this._execution !== null) {
+          this.stopExecuting();
+        }
       },
     });
+
+    // If we completed synchronously then we need to call `stopExecuting`
+    // synchronously.
+    if (completed) {
+      this.stopExecuting();
+    }
   }
 
   /**

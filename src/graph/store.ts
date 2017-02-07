@@ -6,8 +6,6 @@ import { GraphReference } from './common';
 import { writeToGraph, GetDataIDFn } from './write';
 import { readFromGraph, GraphNodeReadPrimitives } from './read';
 
-const DEFAULT_ID = 'ROOT_QUERY';
-
 // Used to get a new transaction id for uncommit writes.
 let nextTransactionID = 0;
 
@@ -67,13 +65,13 @@ export class ReduxGraphStore {
    * `GraphStore#writeWithoutCommit` method.
    */
   public write ({
-    id: rootID = DEFAULT_ID,
+    id: rootID,
     selectionSet,
     fragments,
     variables,
     data: rootData,
   }: {
-    id?: string | null,
+    id: string | null,
     data: GraphQLObjectData,
     selectionSet: SelectionSetNode,
     fragments?: { [fragmentName: string]: FragmentDefinitionNode },
@@ -124,13 +122,13 @@ export class ReduxGraphStore {
    * rolled back if a mutation fails.
    */
   public writeWithoutCommit ({
-    id: rootID = DEFAULT_ID,
+    id: rootID,
     selectionSet,
     fragments,
     variables,
     data: rootData,
   }: {
-    id?: string | null,
+    id: string | null,
     data: GraphQLObjectData,
     selectionSet: SelectionSetNode,
     fragments?: { [fragmentName: string]: FragmentDefinitionNode },
@@ -192,14 +190,14 @@ export class ReduxGraphStore {
    * Uncommit data will be returned unless `skipUncommitWrites` is defined.
    */
   public read ({
-    id: rootID = DEFAULT_ID,
+    id: rootID,
     selectionSet,
     fragments,
     variables,
     previousData,
     skipUncommitWrites,
   }: {
-    id?: string,
+    id: string,
     selectionSet: SelectionSetNode,
     fragments?: { [fragmentName: string]: FragmentDefinitionNode },
     variables?: { [variableName: string]: GraphQLData },
@@ -285,14 +283,14 @@ export class ReduxGraphStore {
    * from the store.
    */
   public watch ({
-    id = DEFAULT_ID,
+    id,
     selectionSet,
     fragments,
     variables,
     initialData,
     skipUncommitWrites,
   }: {
-    id?: string,
+    id: string,
     selectionSet: SelectionSetNode,
     fragments?: { [fragmentName: string]: FragmentDefinitionNode },
     variables?: { [variableName: string]: GraphQLData },

@@ -57,3 +57,4 @@ import './writeToGraph';
 import './readFromGraph';
 import './GraphStore';
 import './writeThenReadFromGraph';
+import './ObservableOperation';

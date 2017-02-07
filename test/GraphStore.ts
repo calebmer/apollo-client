@@ -59,6 +59,7 @@ describe('ReduxGraphStore', () => {
 
       // Test writing and reading normally.
       assert.deepEqual(graphStore1.write({
+        id: 'root',
         data,
         selectionSet,
         fragments,
@@ -67,6 +68,7 @@ describe('ReduxGraphStore', () => {
         data,
       });
       assert.deepEqual(graphStore1.read({
+        id: 'root',
         selectionSet,
         fragments,
         variables,
@@ -77,12 +79,14 @@ describe('ReduxGraphStore', () => {
 
       // Test writing without committing.
       assert.deepEqual(graphStore2.writeWithoutCommit({
+        id: 'root',
         data,
         selectionSet,
         fragments,
         variables,
       }).data, data);
       assert.deepEqual(graphStore2.read({
+        id: 'root',
         selectionSet,
         fragments,
         variables,
@@ -317,11 +321,13 @@ describe('ReduxGraphStore', () => {
     const graphStore = createGraphStore();
 
     graphStore.write({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
       data: { a: 1, b: 2, c: 3, d: { e: 4, f: { g: 5, h: 6, i: 7 } } },
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -329,11 +335,13 @@ describe('ReduxGraphStore', () => {
     });
 
     const { rollback } = graphStore.writeWithoutCommit({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ c d { f { g i } } }`),
       data: { c: -3, d: { f: { g: -5, i: -7 } } },
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -341,6 +349,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
       skipUncommitWrites: true,
     }), {
@@ -351,6 +360,7 @@ describe('ReduxGraphStore', () => {
     rollback();
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -362,11 +372,13 @@ describe('ReduxGraphStore', () => {
     const graphStore = createGraphStore();
 
     graphStore.write({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
       data: { a: 1, b: 2, c: 3, d: { e: 4, f: { g: 5, h: 6, i: 7 } } },
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -374,11 +386,13 @@ describe('ReduxGraphStore', () => {
     });
 
     const { rollback: rollback1 } = graphStore.writeWithoutCommit({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ c }`),
       data: { c: -3 },
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -386,6 +400,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
       skipUncommitWrites: true,
     }), {
@@ -394,11 +409,13 @@ describe('ReduxGraphStore', () => {
     });
 
     const { rollback: rollback2 } = graphStore.writeWithoutCommit({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ d { f { g i } } }`),
       data: { d: { f: { g: -5, i: -7 } } },
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -406,6 +423,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
       skipUncommitWrites: true,
     }), {
@@ -416,6 +434,7 @@ describe('ReduxGraphStore', () => {
     rollback1();
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -423,6 +442,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
       skipUncommitWrites: true,
     }), {
@@ -433,6 +453,7 @@ describe('ReduxGraphStore', () => {
     rollback2();
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{ a b c d { e f { g h i } } }`),
     }), {
       stale: false,
@@ -444,6 +465,7 @@ describe('ReduxGraphStore', () => {
     const graphStore = createGraphStore();
 
     graphStore.write({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         foo {
           a b c
@@ -465,6 +487,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         foo {
           a b c
@@ -486,6 +509,7 @@ describe('ReduxGraphStore', () => {
     });
 
     graphStore.write({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         bar {
           d barBonus
@@ -507,6 +531,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         foo {
           a b c fooBonus
@@ -532,6 +557,7 @@ describe('ReduxGraphStore', () => {
     const graphStore = createGraphStore();
 
     graphStore.write({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         foo {
           a b c
@@ -553,6 +579,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         foo {
           a b c
@@ -574,6 +601,7 @@ describe('ReduxGraphStore', () => {
     });
 
     const { rollback } = graphStore.writeWithoutCommit({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         bar {
           d barBonus
@@ -595,6 +623,7 @@ describe('ReduxGraphStore', () => {
     });
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         foo {
           a b c fooBonus
@@ -618,6 +647,7 @@ describe('ReduxGraphStore', () => {
     rollback();
 
     assert.deepEqual(graphStore.read({
+      id: 'root',
       selectionSet: parseSelectionSet(`{
         foo {
           a b c
@@ -644,6 +674,7 @@ describe('ReduxGraphStore', () => {
       const graph = createGraphStore();
 
       graph.watch({
+        id: 'root',
         selectionSet: parseSelectionSet(`{ a b c }`),
       }).subscribe({
         next: result => done(new Error('Unreachable.')),
@@ -660,6 +691,7 @@ describe('ReduxGraphStore', () => {
       const graph = createGraphStore();
 
       graph.watch({
+        id: 'root',
         selectionSet: parseSelectionSet(`{ a b c }`),
       }).subscribe({
         next: () => done(new Error('Unreachable.')),
@@ -668,12 +700,14 @@ describe('ReduxGraphStore', () => {
       });
 
       graph.write({
+        id: 'root',
         selectionSet: parseSelectionSet('{ a }'),
         data: { a: 1 },
       });
 
       setTimeout(() => {
         graph.write({
+          id: 'root',
           selectionSet: parseSelectionSet('{ b }'),
           data: { b: 2 },
         });
@@ -689,6 +723,7 @@ describe('ReduxGraphStore', () => {
       const graph = createGraphStore();
 
       graph.watch({
+        id: 'root',
         selectionSet: parseSelectionSet(`{ a b c }`),
       }).subscribe({
         next: result => {
@@ -706,6 +741,7 @@ describe('ReduxGraphStore', () => {
       });
 
       graph.write({
+        id: 'root',
         selectionSet: parseSelectionSet('{ a b }'),
         data: { a: 1, b: 2 },
       });
@@ -713,6 +749,7 @@ describe('ReduxGraphStore', () => {
       setTimeout(() => {
         deadzone = false;
         graph.write({
+          id: 'root',
           selectionSet: parseSelectionSet('{ c }'),
           data: { c: 3 },
         });
@@ -723,6 +760,7 @@ describe('ReduxGraphStore', () => {
       const graph = createGraphStore();
 
       graph.write({
+        id: 'root',
         selectionSet: parseSelectionSet(`{ a b c }`),
         data: { a: 1, b: 2, c: 3 },
       });
@@ -730,11 +768,13 @@ describe('ReduxGraphStore', () => {
       testObservable(
         done,
         graph.watch({
+          id: 'root',
           selectionSet: parseSelectionSet(`{ a b c }`),
         }),
         data => {
           assert.deepEqual(data, { stale: false, data: { a: 1, b: 2, c: 3 } });
           graph.write({
+            id: 'root',
             selectionSet: parseSelectionSet(`{ a b c }`),
             data: { a: 4, b: 5, c: 6 },
           });
@@ -742,6 +782,7 @@ describe('ReduxGraphStore', () => {
         data => {
           assert.deepEqual(data, { stale: false, data: { a: 4, b: 5, c: 6 } });
           graph.write({
+            id: 'root',
             selectionSet: parseSelectionSet(`{ a }`),
             data: { a: 1 },
           });
@@ -749,6 +790,7 @@ describe('ReduxGraphStore', () => {
         data => {
           assert.deepEqual(data, { stale: false, data: { a: 1, b: 5, c: 6 } });
           graph.write({
+            id: 'root',
             selectionSet: parseSelectionSet(`{ b }`),
             data: { b: 2 },
           });
@@ -756,6 +798,7 @@ describe('ReduxGraphStore', () => {
         data => {
           assert.deepEqual(data, { stale: false, data: { a: 1, b: 2, c: 6 } });
           graph.write({
+            id: 'root',
             selectionSet: parseSelectionSet(`{ c }`),
             data: { c: 3 },
           });
@@ -770,6 +813,7 @@ describe('ReduxGraphStore', () => {
       const graph = createGraphStore();
 
       graph.write({
+        id: 'root',
         selectionSet: parseSelectionSet(`{ a b c }`),
         data: { a: 1, b: 2, c: 3 },
       });
@@ -779,18 +823,21 @@ describe('ReduxGraphStore', () => {
       testObservable(
         done,
         graph.watch({
+          id: 'root',
           selectionSet: parseSelectionSet(`{ a b c }`),
         }),
         data => {
           assert.deepEqual(data, { stale: false, data: { a: 1, b: 2, c: 3 } });
           deadZone = true;
           graph.write({
+            id: 'root',
             selectionSet: parseSelectionSet(`{ a b c }`),
             data: { a: 1, b: 2, c: 3 },
           });
           // Nothing should happen...
           setTimeout(() => {
             graph.write({
+              id: 'root',
               selectionSet: parseSelectionSet(`{ d }`),
               data: { d: 4 },
             });
@@ -799,6 +846,7 @@ describe('ReduxGraphStore', () => {
               deadZone = false;
               // This actually changes things and should trigger an update.
               graph.write({
+                id: 'root',
                 selectionSet: parseSelectionSet(`{ a b c }`),
                 data: { a: 4, b: 5, c: 6 },
               });
@@ -820,12 +868,14 @@ describe('ReduxGraphStore', () => {
       testObservable(
         done,
         graph.watch({
+          id: 'root',
           selectionSet: parseSelectionSet(`{ a b c }`),
           initialData: { a: 1, b: 2, c: 3 },
         }),
         data => {
           assert.deepEqual(data, { stale: false, data: { a: 1, b: 2, c: 3 } });
           graph.write({
+            id: 'root',
             selectionSet: parseSelectionSet(`{ a b c }`),
             data: { a: 4, b: 5, c: 6 },
           });
