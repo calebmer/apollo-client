@@ -7,7 +7,7 @@ import { Observable } from '../src/util/Observable';
 import { ApolloAction } from '../src/actions';
 import { GraphQLData, GraphQLObjectData } from '../src/graphql/data';
 import { ReduxGraphStore, ReduxState } from '../src/graph/store';
-import { ObservableOperation } from '../src/core/ObservableOperation';
+import { ObservableOperation } from '../src/core/operation';
 
 const TEST_ID_KEY = Symbol('testIdKey');
 const getDataID = (object: any) => object[TEST_ID_KEY];
