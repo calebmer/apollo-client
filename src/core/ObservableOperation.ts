@@ -360,7 +360,7 @@ export class ObservableOperation extends Observable<OperationState> {
       this._watch();
     } catch (error) {
       // If this was not a partial read error then we need to throw.
-      if (error._partialRead) {
+      if (!error._partialRead) {
         throw error;
       }
 
