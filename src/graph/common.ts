@@ -38,16 +38,17 @@ export function getFieldKey (
 
   // If the field has arguments then add them to the key.
   if (field.arguments && field.arguments.length > 0) {
-    key += `({${field.arguments.map(arg => `"${arg.name.value}":${valueIntoJSON(arg.value, variables)}`).join(',')}})`;
+    key += `(${field.arguments.map(arg => `${arg.name.value}:${valueIntoKey(arg.value, variables)}`).join(',')})`;
   }
 
   return key;
 }
 
 /**
- * Transforms a GraphQL AST `ValueNode` into a JSON string.
+ * Transforms a GraphQL AST `ValueNode` into a key form that looks like JSON,
+ * but need not be exactly JSON.
  */
-export function valueIntoJSON (
+export function valueIntoKey (
   value: ValueNode,
   variables: { [variableName: string]: GraphQLData },
 ): string {
@@ -56,7 +57,7 @@ export function valueIntoJSON (
       const variableName = value.name.value;
       const variableValue = variables[variableName];
       if (typeof variableValue === 'undefined') {
-        throw new Error(`Could not find variable named '${variableName}'.`);
+        return 'undefined';
       }
       return JSON.stringify(variableValue);
     case 'IntValue':
@@ -69,9 +70,9 @@ export function valueIntoJSON (
     case 'NullValue':
       return 'null';
     case 'ListValue':
-      return `[${value.values.map(item => valueIntoJSON(item, variables)).join(',')}]`;
+      return `[${value.values.map(item => valueIntoKey(item, variables)).join(',')}]`;
     case 'ObjectValue':
-      return `{${value.fields.map(field => `"${field.name.value}":${valueIntoJSON(field.value, variables)}`).join(',')}}`;
+      return `{${value.fields.map(field => `${field.name.value}:${valueIntoKey(field.value, variables)}`).join(',')}}`;
     default:
       throw new Error(`Unrecognized value '${(value as any).kind}'.`);
   }

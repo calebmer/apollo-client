@@ -1,4 +1,4 @@
-import { parse, SelectionSetNode, FragmentDefinitionNode } from 'graphql/language';
+import { parse, SelectionSetNode, FragmentDefinitionNode, OperationDefinitionNode } from 'graphql/language';
 
 export function parseSelectionSet (source: string): SelectionSetNode {
   const document = parse(source);
@@ -24,4 +24,16 @@ export function parseFragmentDefinitionMap (source: string): { [fragmentName: st
   });
 
   return fragments;
+}
+
+export function parseOperationDefinition (source: string): OperationDefinitionNode {
+  const document = parse(source);
+  if (document.definitions.length !== 1) {
+    throw new Error('There should only be one definition.');
+  }
+  const definition = document.definitions[0];
+  if (definition.kind !== 'OperationDefinition') {
+    throw new Error('The single definition must be for an operation.');
+  }
+  return definition;
 }
